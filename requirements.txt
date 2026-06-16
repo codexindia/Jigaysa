@@ -1,0 +1,9 @@
+Django==6.0.6
+djangorestframework
+djangorestframework-simplejwt
+mysqlclient
+django-environ
+django-cors-headers
+drf-spectacular
+pytest
+pytest-django
