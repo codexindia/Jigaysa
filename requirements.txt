@@ -2,6 +2,7 @@ Django==6.0.6
 djangorestframework
 djangorestframework-simplejwt
 mysqlclient
+psycopg[binary]
 django-environ
 django-cors-headers
 drf-spectacular

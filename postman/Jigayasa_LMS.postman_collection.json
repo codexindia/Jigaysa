@@ -1,0 +1,292 @@
+{
+  "info": {
+    "name": "Jigayasa LMS - Auth (Phase 1)",
+    "description": "Authentication & Access Control endpoints for the Jigayasa Smart Hybrid LMS.\n\nBase URL and tokens are stored as collection variables. Run **Login** (or **Register** then **Login**) first; the access/refresh tokens are captured automatically into `{{access}}` and `{{refresh}}` and reused by the other requests.\n\nScaffolded endpoints (OTP / Social / Password reset) return HTTP 501 until implemented in a later phase.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000", "type": "string" },
+    { "key": "access", "value": "", "type": "string" },
+    { "key": "refresh", "value": "", "type": "string" },
+    { "key": "email", "value": "smoke@example.com", "type": "string" },
+    { "key": "password", "value": "StrongPass123!", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test('returns id and role', () => {",
+                  "  pm.expect(b).to.have.property('id');",
+                  "  pm.expect(b).to.have.property('role');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"full_name\": \"Smoke Test\",\n  \"role\": \"student\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "register", ""]
+            },
+            "description": "Email/password signup. `role` may be `student` or `trainer` (admin/institution are gated)."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "if (b.access) pm.collectionVariables.set('access', b.access);",
+                  "if (b.refresh) pm.collectionVariables.set('refresh', b.refresh);",
+                  "pm.test('tokens captured', () => {",
+                  "  pm.expect(b).to.have.property('access');",
+                  "  pm.expect(b).to.have.property('refresh');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login", ""]
+            },
+            "description": "Obtain a JWT access + refresh pair. Tokens are auto-saved to collection variables."
+          }
+        },
+        {
+          "name": "Me (get profile)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "me", ""]
+            },
+            "description": "Current authenticated user's profile."
+          }
+        },
+        {
+          "name": "Me (update profile)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Updated Name\",\n  \"phone\": \"+10000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "me", ""]
+            },
+            "description": "Update editable profile fields (email/role/organization are read-only here)."
+          }
+        },
+        {
+          "name": "Token Refresh",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "if (b.access) pm.collectionVariables.set('access', b.access);",
+                  "if (b.refresh) pm.collectionVariables.set('refresh', b.refresh);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/token/refresh/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "token", "refresh", ""]
+            },
+            "description": "Exchange a refresh token for a new access token. With rotation enabled, a new refresh token is also returned and the old one is blacklisted."
+          }
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 205', () => pm.response.to.have.status(205));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/logout/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "logout", ""]
+            },
+            "description": "Blacklist the refresh token. Note: if you ran Token Refresh first, that already rotated/blacklisted the old refresh token, so use the latest {{refresh}}."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Scaffolded (501 - later phase)",
+      "item": [
+        {
+          "name": "OTP Request",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"+10000000000\"\n}" },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/otp/request/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "otp", "request", ""]
+            }
+          }
+        },
+        {
+          "name": "OTP Verify",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"+10000000000\",\n  \"code\": \"123456\"\n}" },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/otp/verify/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "otp", "verify", ""]
+            }
+          }
+        },
+        {
+          "name": "Social Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"provider\": \"google\",\n  \"token\": \"<id_token>\"\n}" },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/social/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "social", ""]
+            }
+          }
+        },
+        {
+          "name": "Password Reset Request",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\"\n}" },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/password-reset/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "password-reset", ""]
+            }
+          }
+        },
+        {
+          "name": "Password Reset Confirm",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"token\": \"<reset_token>\",\n  \"password\": \"NewStrongPass123!\"\n}" },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/password-reset/confirm/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "password-reset", "confirm", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Docs",
+      "item": [
+        {
+          "name": "OpenAPI Schema",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/schema/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "schema", ""]
+            }
+          }
+        },
+        {
+          "name": "Swagger UI",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/docs/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "docs", ""]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

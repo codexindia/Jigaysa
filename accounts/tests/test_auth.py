@@ -4,7 +4,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.test import APIClient, APIRequestFactory
+from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 from rest_framework.views import APIView
 
 from accounts.models import LoginActivity, Role
@@ -150,7 +150,7 @@ class _AdminOnlyView(APIView):
 def test_rbac_student_forbidden_from_admin_view(student):
     factory = APIRequestFactory()
     request = factory.get("/admin-only/")
-    request.user = student
+    force_authenticate(request, user=student)
     response = _AdminOnlyView.as_view()(request)
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
@@ -161,7 +161,7 @@ def test_rbac_admin_allowed(db):
     )
     factory = APIRequestFactory()
     request = factory.get("/admin-only/")
-    request.user = admin
+    force_authenticate(request, user=admin)
     response = _AdminOnlyView.as_view()(request)
     assert response.status_code == status.HTTP_200_OK
 

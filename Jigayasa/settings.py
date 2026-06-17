@@ -60,6 +60,17 @@ THIRD_PARTY_APPS = [
 LOCAL_APPS = [
     'core',
     'accounts',
+    'courses',
+    'payments',
+    'live',
+    'recordings',
+    'library',
+    'assessments',
+    'certificates',
+    'engagement',
+    'notifications',
+    'classrooms',
+    'analytics',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -108,6 +119,15 @@ DATABASES = {
         "PORT": env("DB_PORT", default="3306"),
     }
 }
+
+# MySQL-specific tuning: force InnoDB + utf8mb4 so unique varchar indexes
+# (email, slug) don't hit MyISAM's 1000-byte key limit. Applied only for the
+# MySQL backend, keeping the config drop-in ready for PostgreSQL.
+if "mysql" in DATABASES["default"]["ENGINE"]:
+    DATABASES["default"]["OPTIONS"] = {
+        "charset": "utf8mb4",
+        "init_command": "SET default_storage_engine=INNODB",
+    }
 
 
 # Custom user model (must be set before the first migration).

@@ -52,6 +52,70 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         return self.email
 
 
+class UserProfile(TimeStampedModel):
+    """Public-facing profile shown on the dashboard header (all roles).
+
+    Kept separate from ``User`` so auth stays lean while bios, avatars and
+    social links can grow freely.
+    """
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="profile"
+    )
+    headline = models.CharField(max_length=255, blank=True)
+    bio = models.TextField(blank=True)
+    avatar = models.URLField(blank=True)
+    location = models.CharField(max_length=255, blank=True)
+    website = models.URLField(blank=True)
+    github_url = models.URLField(blank=True)
+    linkedin_url = models.URLField(blank=True)
+    language = models.CharField(max_length=20, default="en")
+    timezone = models.CharField(max_length=64, default="UTC")
+    tags = models.ManyToManyField("courses.Tag", blank=True, related_name="profiles")
+
+    def __str__(self):
+        return f"Profile<{self.user.email}>"
+
+
+class TrainerProfile(TimeStampedModel):
+    """Trainer-specific data (PRD §2.2, §3.3 revenue sharing, admin approval)."""
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="trainer_profile"
+    )
+    expertise = models.CharField(max_length=255, blank=True)
+    years_experience = models.PositiveIntegerField(default=0)
+    rating_avg = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    rating_count = models.PositiveIntegerField(default=0)
+    is_approved = models.BooleanField(default=False)  # admin onboarding gate
+    revenue_share_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, default=70
+    )
+    payout_account_ref = models.CharField(max_length=255, blank=True)
+
+    def __str__(self):
+        return f"TrainerProfile<{self.user.email}>"
+
+
+class LearnerStats(TimeStampedModel):
+    """Denormalized learner dashboard counters (PRD §3.12 learning progress)."""
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="learner_stats"
+    )
+    streak_days = models.PositiveIntegerField(default=0)
+    last_active_date = models.DateField(null=True, blank=True)
+    courses_enrolled = models.PositiveIntegerField(default=0)
+    avg_progress = models.PositiveIntegerField(default=0)  # 0-100
+    certificates_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name_plural = "learner stats"
+
+    def __str__(self):
+        return f"LearnerStats<{self.user.email}>"
+
+
 class LoginActivity(TimeStampedModel):
     """Login audit trail (PRD §3.1 advanced: login activity logs)."""
 
