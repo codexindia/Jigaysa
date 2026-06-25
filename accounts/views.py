@@ -27,6 +27,7 @@ class RegisterView(generics.CreateAPIView):
 
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
+    api_roles = ("public",)
 
 
 class LoginView(TokenObtainPairView):
@@ -34,6 +35,7 @@ class LoginView(TokenObtainPairView):
 
     serializer_class = TokenPairSerializer
     permission_classes = [AllowAny]
+    api_roles = ("public",)
 
     def post(self, request, *args, **kwargs):
         email = request.data.get("email", "")
@@ -60,6 +62,7 @@ class LogoutView(APIView):
 
     permission_classes = [IsAuthenticated]
     serializer_class = LogoutSerializer
+    api_roles = ("student", "trainer", "admin", "institution")
 
     def post(self, request):
         serializer = LogoutSerializer(data=request.data)
@@ -79,6 +82,7 @@ class MeView(generics.RetrieveUpdateAPIView):
 
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
+    api_roles = ("student", "trainer", "admin", "institution")
 
     def get_object(self):
         return self.request.user
@@ -95,6 +99,7 @@ class _NotImplementedView(APIView):
     """
 
     permission_classes = [AllowAny]
+    api_roles = ("public",)
     feature = "This endpoint"
 
     def post(self, request, *args, **kwargs):

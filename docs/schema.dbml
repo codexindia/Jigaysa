@@ -1,0 +1,1100 @@
+// Jigayasa LMS — Database schema (DBML)
+// Paste into https://dbdiagram.io  (or use `dbdocs build docs/schema.dbml`)
+// Table names match Django's generated tables (app_model). Generated for the
+// schema as of the courses/payments/live/recordings/library/assessments/
+// certificates/engagement/notifications/classrooms/analytics apps (ai removed).
+
+Project jigayasa_lms {
+  database_type: 'MySQL'
+  Note: 'Smart Hybrid LMS — student + trainer modules built; institution/admin/Phase-2 design-ready.'
+}
+
+//============================================================
+// ENUMS
+//============================================================
+Enum user_role { admin
+  trainer
+  student
+  institution }
+Enum org_type { institution
+  corporate }
+
+Enum course_type { self_paced
+  live_batch
+  physical
+  hybrid
+  individual_coaching
+  group_coaching }
+Enum skill_level { beginner
+  intermediate
+  advanced }
+Enum course_status { draft
+  pending_review
+  published
+  archived }
+Enum visibility { public
+  unlisted
+  private }
+Enum lesson_content_type { video
+  reading
+  quiz
+  assignment
+  live }
+Enum enrollment_status { active
+  completed
+  cancelled
+  refunded }
+Enum enrollment_source { purchase
+  free
+  bulk
+  institution }
+Enum lesson_progress_status { not_started
+  in_progress
+  completed }
+
+Enum billing_period { monthly
+  quarterly
+  annual }
+Enum discount_type { percent
+  flat }
+Enum coupon_scope { course
+  plan
+  all }
+Enum pricing_type { one_time
+  subscription
+  installment
+  per_session
+  corporate
+  group }
+Enum payment_method_type { card
+  upi
+  netbanking }
+Enum subscription_status { active
+  cancelled
+  expired
+  past_due }
+Enum order_status { pending
+  paid
+  failed
+  refunded }
+Enum order_item_type { course
+  plan
+  session
+  batch }
+Enum invoice_status { paid
+  pending
+  refunded }
+Enum payment_gateway { razorpay
+  stripe
+  paypal
+  upi }
+Enum payment_status { created
+  success
+  failed }
+Enum refund_status { requested
+  processed
+  failed }
+Enum payout_status { pending
+  paid }
+
+Enum session_type { group
+  individual
+  workshop
+  qa }
+Enum session_status { scheduled
+  live
+  completed
+  cancelled }
+Enum registration_status { registered
+  waitlisted
+  cancelled }
+Enum booking_status { pending
+  confirmed
+  completed
+  cancelled }
+Enum doubt_status { open
+  answered }
+
+Enum recording_status { processing
+  ready }
+
+Enum library_format { video
+  ebook
+  notes
+  webinar
+  sample_lesson
+  cert_resource }
+Enum access_level { free
+  premium }
+
+Enum assessment_type { quiz
+  assignment
+  coding
+  descriptive }
+Enum grading_type { auto
+  manual
+  rubric }
+Enum question_type { mcq
+  multi
+  descriptive
+  coding
+  file }
+Enum submission_status { in_progress
+  submitted
+  graded
+  passed
+  failed }
+
+Enum certificate_status { issued
+  revoked }
+
+Enum thread_scope { course
+  community }
+Enum thread_status { open
+  resolved }
+
+Enum notification_category { course
+  live_class
+  assessment
+  certificate
+  forum
+  payment
+  system }
+Enum device_platform { android
+  ios
+  web }
+
+Enum room_type { physical
+  smart
+  container }
+Enum device_type { mic
+  camera
+  speaker
+  smartboard
+  display }
+Enum classroom_session_status { scheduled
+  live
+  completed }
+Enum smart_event_type { voice
+  motion
+  raise_hand }
+Enum analytics_scope { platform
+  trainer
+  course
+  organization }
+
+//============================================================
+// ACCOUNTS + CORE
+//============================================================
+Table core_organization {
+  id int [pk, increment]
+  name varchar
+  slug varchar [unique]
+  type org_type
+  is_active bool
+  created_at datetime
+  updated_at datetime
+}
+
+Table accounts_user {
+  id int [pk, increment]
+  email varchar [unique, not null]
+  full_name varchar
+  role user_role
+  phone varchar [null]
+  phone_verified bool
+  organization_id int [ref: > core_organization.id, null]
+  is_active bool
+  is_staff bool
+  is_superuser bool
+  password varchar
+  last_login datetime [null]
+  created_at datetime
+  updated_at datetime
+}
+
+Table accounts_loginactivity {
+  id int [pk, increment]
+  user_id int [ref: > accounts_user.id, null]
+  email_attempted varchar
+  ip_address varchar [null]
+  user_agent text
+  success bool
+  created_at datetime
+}
+
+Table accounts_userprofile {
+  id int [pk, increment]
+  user_id int [ref: - accounts_user.id, unique]
+  headline varchar
+  bio text
+  avatar varchar
+  location varchar
+  website varchar
+  github_url varchar
+  linkedin_url varchar
+  language varchar
+  timezone varchar
+}
+
+Table accounts_userprofile_tags {
+  id int [pk, increment]
+  userprofile_id int [ref: > accounts_userprofile.id]
+  tag_id int [ref: > courses_tag.id]
+}
+
+Table accounts_trainerprofile {
+  id int [pk, increment]
+  user_id int [ref: - accounts_user.id, unique]
+  expertise varchar
+  years_experience int
+  rating_avg decimal
+  rating_count int
+  is_approved bool
+  revenue_share_pct decimal
+  payout_account_ref varchar
+}
+
+Table accounts_learnerstats {
+  id int [pk, increment]
+  user_id int [ref: - accounts_user.id, unique]
+  streak_days int
+  last_active_date date [null]
+  courses_enrolled int
+  avg_progress int
+  certificates_count int
+}
+
+//============================================================
+// COURSES
+//============================================================
+Table courses_category {
+  id int [pk, increment]
+  name varchar
+  slug varchar [unique]
+  parent_id int [ref: > courses_category.id, null]
+  icon varchar
+}
+
+Table courses_tag {
+  id int [pk, increment]
+  name varchar
+  slug varchar [unique]
+}
+
+Table courses_course {
+  id int [pk, increment]
+  title varchar
+  slug varchar [unique]
+  subtitle varchar
+  description text
+  trainer_id int [ref: > accounts_user.id]
+  organization_id int [ref: > core_organization.id, null]
+  category_id int [ref: > courses_category.id, null]
+  course_type course_type
+  skill_level skill_level
+  language varchar
+  duration_minutes int
+  thumbnail varchar
+  intro_video_url varchar
+  status course_status
+  visibility visibility
+  is_free bool
+  rating_avg decimal
+  rating_count int
+  enrolled_count int
+  published_at datetime [null]
+  created_at datetime
+  updated_at datetime
+}
+
+Table courses_course_tags {
+  id int [pk, increment]
+  course_id int [ref: > courses_course.id]
+  tag_id int [ref: > courses_tag.id]
+}
+
+Table courses_course_prerequisites {
+  id int [pk, increment]
+  from_course_id int [ref: > courses_course.id]
+  to_course_id int [ref: > courses_course.id]
+}
+
+Table courses_module {
+  id int [pk, increment]
+  course_id int [ref: > courses_course.id]
+  title varchar
+  summary text
+  order int
+}
+
+Table courses_lesson {
+  id int [pk, increment]
+  module_id int [ref: > courses_module.id]
+  title varchar
+  content_type lesson_content_type
+  order int
+  duration_minutes int
+  video_url varchar
+  content text
+  is_preview bool
+  assessment_id int [ref: > assessments_assessment.id, null]
+  live_session_id int [ref: > live_livesession.id, null]
+}
+
+Table courses_lessonresource {
+  id int [pk, increment]
+  lesson_id int [ref: > courses_lesson.id]
+  title varchar
+  url varchar
+  file varchar
+  resource_type varchar
+}
+
+Table courses_batch {
+  id int [pk, increment]
+  course_id int [ref: > courses_course.id]
+  name varchar
+  trainer_id int [ref: > accounts_user.id, null]
+  organization_id int [ref: > core_organization.id, null]
+  start_date date [null]
+  end_date date [null]
+  capacity int
+  enrolled_count int
+  schedule json
+}
+
+Table courses_enrollment {
+  id int [pk, increment]
+  student_id int [ref: > accounts_user.id]
+  course_id int [ref: > courses_course.id]
+  batch_id int [ref: > courses_batch.id, null]
+  status enrollment_status
+  source enrollment_source
+  order_id int [ref: > payments_order.id, null]
+  progress_pct int
+  enrolled_at datetime
+  completed_at datetime [null]
+
+  indexes {
+    (student_id, course_id) [unique]
+  }
+}
+
+Table courses_lessonprogress {
+  id int [pk, increment]
+  enrollment_id int [ref: > courses_enrollment.id]
+  lesson_id int [ref: > courses_lesson.id]
+  status lesson_progress_status
+  watch_pct int
+  time_spent_seconds int
+  last_position_seconds int
+  completed_at datetime [null]
+
+  indexes {
+    (enrollment_id, lesson_id) [unique]
+  }
+}
+
+Table courses_coursereview {
+  id int [pk, increment]
+  course_id int [ref: > courses_course.id]
+  student_id int [ref: > accounts_user.id]
+  rating int
+  comment text
+
+  indexes {
+    (course_id, student_id) [unique]
+  }
+}
+
+//============================================================
+// PAYMENTS
+//============================================================
+Table payments_pricingplan {
+  id int [pk, increment]
+  name varchar
+  slug varchar [unique]
+  billing_period billing_period
+  price decimal
+  currency varchar
+  features json
+  is_active bool
+}
+
+Table payments_coupon {
+  id int [pk, increment]
+  code varchar [unique]
+  discount_type discount_type
+  value decimal
+  scope coupon_scope
+  min_amount decimal
+  max_redemptions int
+  used_count int
+  valid_from datetime [null]
+  valid_to datetime [null]
+  is_active bool
+}
+
+Table payments_courseprice {
+  id int [pk, increment]
+  course_id int [ref: > courses_course.id]
+  pricing_type pricing_type
+  amount decimal
+  currency varchar
+  discount_percent decimal
+  discount_amount decimal
+  valid_from datetime [null]
+  valid_to datetime [null]
+}
+
+Table payments_paymentmethod {
+  id int [pk, increment]
+  user_id int [ref: > accounts_user.id]
+  type payment_method_type
+  brand varchar
+  last4 varchar
+  expiry varchar
+  gateway_token varchar
+  is_default bool
+}
+
+Table payments_subscription {
+  id int [pk, increment]
+  user_id int [ref: > accounts_user.id]
+  plan_id int [ref: > payments_pricingplan.id]
+  status subscription_status
+  current_period_start datetime [null]
+  current_period_end datetime [null]
+  payment_method_id int [ref: > payments_paymentmethod.id, null]
+  gateway_subscription_id varchar
+  cancel_at datetime [null]
+}
+
+Table payments_order {
+  id int [pk, increment]
+  user_id int [ref: > accounts_user.id]
+  status order_status
+  subtotal decimal
+  discount decimal
+  tax_gst decimal
+  total decimal
+  currency varchar
+  coupon_id int [ref: > payments_coupon.id, null]
+  created_at datetime
+}
+
+Table payments_orderitem {
+  id int [pk, increment]
+  order_id int [ref: > payments_order.id]
+  item_type order_item_type
+  object_id int [null]
+  title varchar
+  amount decimal
+  qty int
+}
+
+Table payments_invoice {
+  id int [pk, increment]
+  order_id int [ref: > payments_order.id, null]
+  number varchar [unique]
+  user_id int [ref: > accounts_user.id]
+  description varchar
+  amount decimal
+  gst_amount decimal
+  status invoice_status
+  issued_date date [null]
+  pdf_url varchar
+}
+
+Table payments_payment {
+  id int [pk, increment]
+  order_id int [ref: > payments_order.id]
+  gateway payment_gateway
+  gateway_payment_id varchar
+  amount decimal
+  method varchar
+  status payment_status
+  paid_at datetime [null]
+  raw json
+}
+
+Table payments_refund {
+  id int [pk, increment]
+  payment_id int [ref: > payments_payment.id]
+  amount decimal
+  reason varchar
+  status refund_status
+  processed_at datetime [null]
+}
+
+Table payments_trainerpayout {
+  id int [pk, increment]
+  trainer_id int [ref: > accounts_user.id]
+  period_start date [null]
+  period_end date [null]
+  gross decimal
+  platform_fee decimal
+  net decimal
+  status payout_status
+  paid_at datetime [null]
+}
+
+//============================================================
+// LIVE
+//============================================================
+Table live_livesession {
+  id int [pk, increment]
+  course_id int [ref: > courses_course.id, null]
+  batch_id int [ref: > courses_batch.id, null]
+  trainer_id int [ref: > accounts_user.id]
+  title varchar
+  description text
+  session_type session_type
+  scheduled_start datetime [null]
+  duration_minutes int
+  capacity int
+  registration_limit int
+  status session_status
+  join_url varchar
+  meeting_id varchar
+  recording_id int [ref: > recordings_recording.id, null]
+  attendees_count int
+}
+
+Table live_sessionregistration {
+  id int [pk, increment]
+  session_id int [ref: > live_livesession.id]
+  student_id int [ref: > accounts_user.id]
+  status registration_status
+  registered_at datetime
+  joined_at datetime [null]
+  attended bool
+
+  indexes {
+    (session_id, student_id) [unique]
+  }
+}
+
+Table live_attendance {
+  id int [pk, increment]
+  session_id int [ref: > live_livesession.id]
+  student_id int [ref: > accounts_user.id]
+  joined_at datetime [null]
+  left_at datetime [null]
+  duration_seconds int
+  present bool
+}
+
+Table live_traineravailability {
+  id int [pk, increment]
+  trainer_id int [ref: > accounts_user.id]
+  start datetime
+  end datetime
+  slot_minutes int
+  is_booked bool
+}
+
+Table live_individualbooking {
+  id int [pk, increment]
+  trainer_id int [ref: > accounts_user.id]
+  student_id int [ref: > accounts_user.id]
+  start datetime [null]
+  duration_minutes int
+  status booking_status
+  order_id int [ref: > payments_order.id, null]
+  meeting_url varchar
+}
+
+Table live_sessiondoubt {
+  id int [pk, increment]
+  session_id int [ref: > live_livesession.id]
+  student_id int [ref: > accounts_user.id]
+  text text
+  status doubt_status
+  asked_at datetime
+}
+
+//============================================================
+// RECORDINGS
+//============================================================
+Table recordings_recording {
+  id int [pk, increment]
+  session_id int [ref: > live_livesession.id, null]
+  course_id int [ref: > courses_course.id, null]
+  trainer_id int [ref: > accounts_user.id, null]
+  title varchar
+  video_url varchar
+  cdn_url varchar
+  duration_seconds int
+  recorded_date date [null]
+  views_count int
+  ai_summary text
+  status recording_status
+}
+
+Table recordings_recordingchapter {
+  id int [pk, increment]
+  recording_id int [ref: > recordings_recording.id]
+  title varchar
+  start_seconds int
+  order int
+}
+
+Table recordings_recordingtranscript {
+  id int [pk, increment]
+  recording_id int [ref: - recordings_recording.id, unique]
+  segments json
+  language varchar
+}
+
+Table recordings_recordingview {
+  id int [pk, increment]
+  recording_id int [ref: > recordings_recording.id]
+  user_id int [ref: > accounts_user.id]
+  watched_seconds int
+  last_position int
+  completed bool
+
+  indexes {
+    (recording_id, user_id) [unique]
+  }
+}
+
+//============================================================
+// LIBRARY
+//============================================================
+Table library_libraryresource {
+  id int [pk, increment]
+  title varchar
+  slug varchar [unique]
+  description text
+  format library_format
+  category_id int [ref: > courses_category.id, null]
+  author_id int [ref: > accounts_user.id, null]
+  course_id int [ref: > courses_course.id, null]
+  file_url varchar
+  video_url varchar
+  duration_minutes int
+  pages int
+  access_level access_level
+  views_count int
+  popularity_score int
+  thumbnail varchar
+  published_at datetime [null]
+}
+
+Table library_librarybookmark {
+  id int [pk, increment]
+  user_id int [ref: > accounts_user.id]
+  resource_id int [ref: > library_libraryresource.id]
+  saved_at datetime
+
+  indexes {
+    (user_id, resource_id) [unique]
+  }
+}
+
+//============================================================
+// ASSESSMENTS
+//============================================================
+Table assessments_assessment {
+  id int [pk, increment]
+  course_id int [ref: > courses_course.id]
+  lesson_id int [ref: > courses_lesson.id, null]
+  trainer_id int [ref: > accounts_user.id]
+  title varchar
+  assessment_type assessment_type
+  description text
+  time_limit_minutes int
+  pass_percent int
+  max_attempts int
+  available_from datetime [null]
+  available_to datetime [null]
+  grading_type grading_type
+  is_published bool
+  total_questions int
+}
+
+Table assessments_question {
+  id int [pk, increment]
+  assessment_id int [ref: > assessments_assessment.id]
+  question_type question_type
+  text text
+  points int
+  order int
+  meta json
+}
+
+Table assessments_choice {
+  id int [pk, increment]
+  question_id int [ref: > assessments_question.id]
+  text varchar
+  is_correct bool
+  order int
+}
+
+Table assessments_submission {
+  id int [pk, increment]
+  assessment_id int [ref: > assessments_assessment.id]
+  student_id int [ref: > accounts_user.id]
+  enrollment_id int [ref: > courses_enrollment.id, null]
+  attempt_no int
+  status submission_status
+  started_at datetime [null]
+  submitted_at datetime [null]
+  score decimal
+  percent int
+  passed bool
+  time_taken_seconds int
+  grader_id int [ref: > accounts_user.id, null]
+  feedback text
+  graded_at datetime [null]
+
+  indexes {
+    (assessment_id, student_id, attempt_no) [unique]
+  }
+}
+
+Table assessments_answer {
+  id int [pk, increment]
+  submission_id int [ref: > assessments_submission.id]
+  question_id int [ref: > assessments_question.id]
+  text_answer text
+  file varchar
+  code text
+  is_correct bool
+  points_awarded decimal
+}
+
+Table assessments_answer_selected_choices {
+  id int [pk, increment]
+  answer_id int [ref: > assessments_answer.id]
+  choice_id int [ref: > assessments_choice.id]
+}
+
+Table assessments_rubric {
+  id int [pk, increment]
+  assessment_id int [ref: - assessments_assessment.id, unique]
+  criteria json
+}
+
+//============================================================
+// CERTIFICATES
+//============================================================
+Table certificates_certificatetemplate {
+  id int [pk, increment]
+  name varchar
+  design text
+  course_id int [ref: > courses_course.id, null]
+}
+
+Table certificates_certificate {
+  id int [pk, increment]
+  student_id int [ref: > accounts_user.id]
+  course_id int [ref: > courses_course.id]
+  enrollment_id int [ref: > courses_enrollment.id, null]
+  template_id int [ref: > certificates_certificatetemplate.id, null]
+  serial_number varchar [unique]
+  issued_date date [null]
+  grade varchar
+  total_hours int
+  pdf_url varchar
+  verification_code varchar [unique]
+  status certificate_status
+}
+
+//============================================================
+// ENGAGEMENT (forum + community)
+//============================================================
+Table engagement_discussionthread {
+  id int [pk, increment]
+  course_id int [ref: > courses_course.id, null]
+  batch_id int [ref: > courses_batch.id, null]
+  author_id int [ref: > accounts_user.id]
+  title varchar
+  body text
+  scope thread_scope
+  status thread_status
+  is_pinned bool
+  reply_count int
+  last_activity_at datetime [null]
+}
+
+Table engagement_discussionreply {
+  id int [pk, increment]
+  thread_id int [ref: > engagement_discussionthread.id]
+  author_id int [ref: > accounts_user.id]
+  parent_id int [ref: > engagement_discussionreply.id, null]
+  body text
+  is_accepted_answer bool
+}
+
+Table engagement_communityprofile {
+  id int [pk, increment]
+  user_id int [ref: - accounts_user.id, unique]
+  points int
+  level int
+  badges_count int
+}
+
+Table engagement_badge {
+  id int [pk, increment]
+  name varchar
+  slug varchar [unique]
+  icon varchar
+  description text
+  criteria json
+}
+
+Table engagement_userbadge {
+  id int [pk, increment]
+  user_id int [ref: > accounts_user.id]
+  badge_id int [ref: > engagement_badge.id]
+  earned_at datetime
+
+  indexes {
+    (user_id, badge_id) [unique]
+  }
+}
+
+Table engagement_communitypost {
+  id int [pk, increment]
+  author_id int [ref: > accounts_user.id]
+  body text
+  post_type varchar
+  likes_count int
+}
+
+//============================================================
+// NOTIFICATIONS
+//============================================================
+Table notifications_notification {
+  id int [pk, increment]
+  recipient_id int [ref: > accounts_user.id]
+  category notification_category
+  title varchar
+  body text
+  link varchar
+  is_read bool
+  created_at datetime
+}
+
+Table notifications_notificationpreference {
+  id int [pk, increment]
+  user_id int [ref: > accounts_user.id]
+  category notification_category
+  in_app bool
+  email bool
+  sms bool
+  whatsapp bool
+  push bool
+
+  indexes {
+    (user_id, category) [unique]
+  }
+}
+
+Table notifications_devicetoken {
+  id int [pk, increment]
+  user_id int [ref: > accounts_user.id]
+  token varchar
+  platform device_platform
+
+  indexes {
+    (user_id, token) [unique]
+  }
+}
+
+//============================================================
+// CLASSROOMS (design-ready: smart / physical / container / IoT)
+//============================================================
+Table classrooms_room {
+  id int [pk, increment]
+  organization_id int [ref: > core_organization.id]
+  name varchar
+  room_type room_type
+  capacity int
+  layout json
+  location varchar
+}
+
+Table classrooms_seat {
+  id int [pk, increment]
+  room_id int [ref: > classrooms_room.id]
+  label varchar
+  row int
+  col int
+
+  indexes {
+    (room_id, label) [unique]
+  }
+}
+
+Table classrooms_device {
+  id int [pk, increment]
+  organization_id int [ref: > core_organization.id]
+  device_type device_type
+  identifier varchar
+  status varchar
+  firmware varchar
+}
+
+Table classrooms_seatdevicemapping {
+  id int [pk, increment]
+  seat_id int [ref: > classrooms_seat.id]
+  device_id int [ref: > classrooms_device.id]
+}
+
+Table classrooms_classroomsession {
+  id int [pk, increment]
+  room_id int [ref: > classrooms_room.id]
+  live_session_id int [ref: > live_livesession.id, null]
+  remote_trainer_id int [ref: > accounts_user.id, null]
+  date datetime [null]
+  status classroom_session_status
+}
+
+Table classrooms_seatattendance {
+  id int [pk, increment]
+  classroom_session_id int [ref: > classrooms_classroomsession.id]
+  seat_id int [ref: > classrooms_seat.id]
+  student_id int [ref: > accounts_user.id, null]
+  present bool
+}
+
+Table classrooms_containerclassroom {
+  id int [pk, increment]
+  room_id int [ref: - classrooms_room.id, unique]
+  gps varchar
+  connectivity_status varchar
+  power_status varchar
+  mobile_unit_id varchar
+}
+
+Table classrooms_smartevent {
+  id int [pk, increment]
+  classroom_session_id int [ref: > classrooms_classroomsession.id]
+  seat_id int [ref: > classrooms_seat.id, null]
+  event_type smart_event_type
+  timestamp datetime
+  payload json
+}
+
+//============================================================
+// ANALYTICS (design-ready)
+//============================================================
+Table analytics_analyticssnapshot {
+  id int [pk, increment]
+  scope analytics_scope
+  subject_id int [null]
+  organization_id int [ref: > core_organization.id, null]
+  owner_id int [ref: > accounts_user.id, null]
+  period_start date [null]
+  period_end date [null]
+  metrics json
+}
+
+//============================================================
+// TABLE GROUPS (visual grouping in dbdiagram)
+//============================================================
+TableGroup accounts {
+  core_organization
+  accounts_user
+  accounts_loginactivity
+  accounts_userprofile
+  accounts_trainerprofile
+  accounts_learnerstats
+}
+
+TableGroup courses {
+  courses_category
+  courses_tag
+  courses_course
+  courses_module
+  courses_lesson
+  courses_lessonresource
+  courses_batch
+  courses_enrollment
+  courses_lessonprogress
+  courses_coursereview
+}
+
+TableGroup payments {
+  payments_pricingplan
+  payments_coupon
+  payments_courseprice
+  payments_paymentmethod
+  payments_subscription
+  payments_order
+  payments_orderitem
+  payments_invoice
+  payments_payment
+  payments_refund
+  payments_trainerpayout
+}
+
+TableGroup live {
+  live_livesession
+  live_sessionregistration
+  live_attendance
+  live_traineravailability
+  live_individualbooking
+  live_sessiondoubt
+}
+
+TableGroup recordings {
+  recordings_recording
+  recordings_recordingchapter
+  recordings_recordingtranscript
+  recordings_recordingview
+}
+
+TableGroup library {
+  library_libraryresource
+  library_librarybookmark
+}
+
+TableGroup assessments {
+  assessments_assessment
+  assessments_question
+  assessments_choice
+  assessments_submission
+  assessments_answer
+  assessments_rubric
+}
+
+TableGroup certificates {
+  certificates_certificatetemplate
+  certificates_certificate
+}
+
+TableGroup engagement {
+  engagement_discussionthread
+  engagement_discussionreply
+  engagement_communityprofile
+  engagement_badge
+  engagement_userbadge
+  engagement_communitypost
+}
+
+TableGroup notifications {
+  notifications_notification
+  notifications_notificationpreference
+  notifications_devicetoken
+}
+
+TableGroup classrooms {
+  classrooms_room
+  classrooms_seat
+  classrooms_device
+  classrooms_seatdevicemapping
+  classrooms_classroomsession
+  classrooms_seatattendance
+  classrooms_containerclassroom
+  classrooms_smartevent
+}
+
+TableGroup analytics {
+  analytics_analyticssnapshot
+}
