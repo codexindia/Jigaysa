@@ -208,4 +208,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Destination for `collectstatic` in production (served by nginx/whitenoise).
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

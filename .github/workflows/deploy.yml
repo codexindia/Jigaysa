@@ -1,0 +1,61 @@
+name: Deploy
+
+# Deploy only after the CI workflow succeeds on main. This guarantees we never
+# ship a commit whose tests failed.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
+
+# Never let two deploys overlap on the server.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    # Gate on CI success. (Manual re-runs of this workflow won't have a
+    # conclusion, so allow those through too.)
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+
+    # Use a GitHub Environment so you can require approvals / store env-scoped
+    # secrets. Create it under Settings → Environments → "production".
+    environment: production
+
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          # Fail the step if any remote command fails.
+          script_stop: true
+          script: |
+            set -e
+            cd ${{ secrets.PROJECT_DIR }}
+
+            echo "==> Pulling latest code"
+            git fetch --all
+            git reset --hard origin/main
+
+            echo "==> Activating virtualenv"
+            source ${{ secrets.VENV_DIR }}/bin/activate
+
+            echo "==> Installing dependencies"
+            pip install -r requirements.txt
+
+            echo "==> Running migrations"
+            python manage.py migrate --noinput
+
+            echo "==> Collecting static files"
+            python manage.py collectstatic --noinput
+
+            echo "==> Restarting application service"
+            sudo systemctl restart ${{ secrets.SERVICE_NAME }}
+
+            echo "==> Deploy complete"
