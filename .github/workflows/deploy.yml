@@ -31,7 +31,7 @@ jobs:
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SSH_PORT }}
           # Fail the step if any remote command fails.
           script_stop: true
@@ -42,18 +42,6 @@ jobs:
             echo "==> Pulling latest code"
             git fetch --all
             git reset --hard origin/main
-
-            echo "==> Activating virtualenv"
-            source ${{ secrets.VENV_DIR }}/bin/activate
-
-            echo "==> Installing dependencies"
-            pip install -r requirements.txt
-
-            echo "==> Running migrations"
-            python manage.py migrate --noinput
-
-            echo "==> Collecting static files"
-            python manage.py collectstatic --noinput
 
             echo "==> Restarting application service"
             sudo systemctl restart ${{ secrets.SERVICE_NAME }}
