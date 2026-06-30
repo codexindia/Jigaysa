@@ -23,7 +23,7 @@ jobs:
 
     # Use a GitHub Environment so you can require approvals / store env-scoped
     # secrets. Create it under Settings → Environments → "production".
-    environment: production
+    environment: development
 
     steps:
       - name: Deploy over SSH
