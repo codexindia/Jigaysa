@@ -86,7 +86,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'Jigayasa.urls'
+ROOT_URLCONF = 'Jigaysa.urls'
 
 TEMPLATES = [
     {
@@ -103,7 +103,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'Jigayasa.wsgi.application'
+WSGI_APPLICATION = 'Jigaysa.wsgi.application'
 
 
 # Database
@@ -112,7 +112,7 @@ WSGI_APPLICATION = 'Jigayasa.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": env("DB_ENGINE", default="django.db.backends.mysql"),
-        "NAME": env("DB_NAME", default="jigayasa"),
+        "NAME": env("DB_NAME", default="jigaysa"),
         "USER": env("DB_USER", default="root"),
         "PASSWORD": env("DB_PASSWORD", default=""),
         "HOST": env("DB_HOST", default="127.0.0.1"),
@@ -178,7 +178,7 @@ SIMPLE_JWT = {
 
 # OpenAPI schema (drf-spectacular)
 SPECTACULAR_SETTINGS = {
-    "TITLE": "Jigayasa Smart Hybrid LMS API",
+    "TITLE": "Jigaysa Smart Hybrid LMS API",
     "DESCRIPTION": "API for the Smart Hybrid LMS platform.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,

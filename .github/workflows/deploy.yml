@@ -1,7 +1,6 @@
 name: Deploy
 
-# Deploy only after the CI workflow succeeds on main. This guarantees we never
-# ship a commit whose tests failed.
+
 on:
   workflow_run:
     workflows: ["CI"]
@@ -40,7 +39,10 @@ jobs:
             cd ${{ secrets.PROJECT_DIR }}
 
             echo "==> Pulling latest code"
-            git fetch --all
+            
+            
+
+
             git reset --hard origin/main
 
             echo "==> Restarting application service"
