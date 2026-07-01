@@ -24,5 +24,5 @@ urlpatterns = [
         SpectacularSwaggerView.as_view(url_name="schema"),
         name="swagger-ui",
     ),
-    path("", lambda request: HttpResponse("hello from server 41")),
+    path("", lambda request: HttpResponse("hello from server 411")),
 ]
