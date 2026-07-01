@@ -6,6 +6,8 @@ on:
     workflows: ["CI"]
     branches: [main]
     types: [completed]
+  # Allow manual deploys (e.g. when CI was skipped with [skip ci]).
+  workflow_dispatch:
 
 # Never let two deploys overlap on the server.
 concurrency:
@@ -43,6 +45,18 @@ jobs:
             
             git fetch origin main
             git reset --hard origin/main
+
+            echo "==> Activating virtualenv"
+            source .venv/bin/activate
+
+            echo "==> Installing dependencies"
+            pip install -r requirements.txt
+
+            echo "==> Running database migrations"
+            python manage.py migrate --noinput
+
+            echo "==> Collecting static files"
+            python manage.py collectstatic --noinput
 
             echo "==> Restarting application service"
             sudo systemctl restart ${{ secrets.SERVICE_NAME }}
