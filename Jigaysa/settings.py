@@ -22,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, ["localhost", "127.0.0.1"]),
-    CORS_ALLOWED_ORIGINS=(list, []),
+    CORS_ALLOWED_ORIGINS=(list, ["http://localhost:3000", "http://127.0.0.1:3000"]),
     JWT_ACCESS_MINUTES=(int, 60),
     JWT_REFRESH_DAYS=(int, 7),
 )
@@ -185,7 +185,14 @@ SPECTACULAR_SETTINGS = {
 }
 
 # CORS — origins for the web/mobile frontend.
+# Explicit origins come from the environment (defaults to localhost:3000).
 CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
+
+# Wildcard subdomains can't be expressed as plain origins, so match any
+# *.jigyaasaa.com host (http/https) via regex.
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https?://([\w-]+\.)*jigyaasaa\.com$",
+]
 
 # Pluggable SMS/OTP provider (mock console provider in dev).
 SMS_PROVIDER = env("SMS_PROVIDER", default="accounts.providers.ConsoleSMSProvider")
