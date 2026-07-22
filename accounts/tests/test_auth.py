@@ -166,9 +166,17 @@ def test_rbac_admin_allowed(db):
     assert response.status_code == status.HTTP_200_OK
 
 
-# --- scaffolded stubs -------------------------------------------------------
+# --- auth flows -------------------------------------------------------------
 
 
-def test_otp_request_is_not_implemented(api):
+def test_otp_request_is_implemented(api):
+    # OTP request is now live (see accounts/tests/test_reset_otp.py) — it returns
+    # a generic 200 whether or not the number is registered.
     resp = api.post(reverse("accounts:otp-request"), {"phone": "+10000000000"}, format="json")
+    assert resp.status_code == status.HTTP_200_OK
+
+
+def test_social_login_still_scaffolded(api):
+    # Social / SSO needs a configured OAuth provider; still returns 501.
+    resp = api.post(reverse("accounts:social-login"), {"token": "x"}, format="json")
     assert resp.status_code == status.HTTP_501_NOT_IMPLEMENTED

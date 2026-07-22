@@ -83,3 +83,36 @@ class LogoutSerializer(serializers.Serializer):
     """Accepts a refresh token to blacklist on logout."""
 
     refresh = serializers.CharField()
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    """Request a reset link/token for an email (PRD §3.1 password reset)."""
+
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """Confirm a reset with the uid+token pair and a new password."""
+
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    new_password = serializers.CharField(
+        write_only=True, style={"input_type": "password"}
+    )
+
+    def validate_new_password(self, value):
+        validate_password(value)
+        return value
+
+
+class OTPRequestSerializer(serializers.Serializer):
+    """Request a login OTP for a mobile number (PRD §3.1 mobile OTP login)."""
+
+    phone = serializers.CharField(max_length=20)
+
+
+class OTPVerifySerializer(serializers.Serializer):
+    """Verify a mobile OTP and log in."""
+
+    phone = serializers.CharField(max_length=20)
+    code = serializers.CharField(max_length=6)

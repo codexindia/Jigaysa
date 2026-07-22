@@ -1,3 +1,9 @@
+import random
+
+from django.contrib.auth.tokens import default_token_generator
+from django.core.cache import cache
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -6,13 +12,22 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from accounts.models import LoginActivity
+from accounts.models import LoginActivity, User
+from accounts.providers import get_sms_provider
 from accounts.serializers import (
     LogoutSerializer,
+    OTPRequestSerializer,
+    OTPVerifySerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
     RegisterSerializer,
     TokenPairSerializer,
     UserSerializer,
 )
+
+# OTP settings (kept simple; move to settings for prod tuning).
+OTP_TTL_SECONDS = 300
+OTP_MAX_ATTEMPTS = 5
 
 
 def _client_ip(request):
@@ -109,21 +124,152 @@ class _NotImplementedView(APIView):
         )
 
 
-class OTPRequestView(_NotImplementedView):
-    feature = "Mobile OTP request"
-
-
-class OTPVerifyView(_NotImplementedView):
-    feature = "Mobile OTP verification"
-
-
 class SocialLoginView(_NotImplementedView):
+    # Social / SSO needs a configured OAuth provider (Google/etc.); left
+    # scaffolded until credentials + a SocialProvider implementation are wired.
     feature = "Social / SSO login"
 
 
-class PasswordResetRequestView(_NotImplementedView):
-    feature = "Password reset request"
+# --- Mobile OTP login (PRD §3.1) -------------------------------------------
 
 
-class PasswordResetConfirmView(_NotImplementedView):
-    feature = "Password reset confirmation"
+def _otp_cache_key(phone):
+    return f"otp:{phone}"
+
+
+class OTPRequestView(APIView):
+    """POST /auth/otp/request/ — send a login OTP to a mobile number."""
+
+    permission_classes = [AllowAny]
+    serializer_class = OTPRequestSerializer
+    api_roles = ("public",)
+
+    def post(self, request):
+        serializer = OTPRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        phone = serializer.validated_data["phone"]
+        code = f"{random.randint(0, 999999):06d}"
+        cache.set(
+            _otp_cache_key(phone),
+            {"code": code, "attempts": 0},
+            timeout=OTP_TTL_SECONDS,
+        )
+        # Only dispatch to a real account's number if one exists, but never
+        # reveal whether it does (anti-enumeration).
+        if User.objects.filter(phone=phone).exists():
+            get_sms_provider().send_otp(phone, code)
+        return Response(
+            {"detail": "If that number is registered, an OTP has been sent."}
+        )
+
+
+class OTPVerifyView(APIView):
+    """POST /auth/otp/verify/ — verify the OTP and issue JWT tokens."""
+
+    permission_classes = [AllowAny]
+    serializer_class = OTPVerifySerializer
+    api_roles = ("public",)
+
+    def post(self, request):
+        serializer = OTPVerifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        phone = serializer.validated_data["phone"]
+        code = serializer.validated_data["code"]
+
+        key = _otp_cache_key(phone)
+        entry = cache.get(key)
+        if not entry:
+            return Response(
+                {"detail": "OTP expired or not requested. Request a new one."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if entry["attempts"] >= OTP_MAX_ATTEMPTS:
+            cache.delete(key)
+            return Response(
+                {"detail": "Too many attempts. Request a new OTP."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+        if code != entry["code"]:
+            entry["attempts"] += 1
+            cache.set(key, entry, timeout=OTP_TTL_SECONDS)
+            return Response(
+                {"detail": "Incorrect OTP."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = User.objects.filter(phone=phone).first()
+        if user is None:
+            return Response(
+                {"detail": "No account is registered with this number."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        cache.delete(key)
+        if not user.phone_verified:
+            user.phone_verified = True
+            user.save(update_fields=["phone_verified"])
+        refresh = RefreshToken.for_user(user)
+        refresh["role"] = user.role
+        refresh["email"] = user.email
+        return Response(
+            {
+                "refresh": str(refresh),
+                "access": str(refresh.access_token),
+                "user": UserSerializer(user).data,
+            }
+        )
+
+
+# --- Password reset (PRD §3.1) ---------------------------------------------
+
+
+class PasswordResetRequestView(APIView):
+    """POST /auth/password-reset/ — issue a uid+token for a known email.
+
+    Always returns 200 (never reveals whether the email exists). The token is
+    delivered out-of-band (email); in dev it's printed to the console.
+    """
+
+    permission_classes = [AllowAny]
+    serializer_class = PasswordResetRequestSerializer
+    api_roles = ("public",)
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+        user = User.objects.filter(email=email, is_active=True).first()
+        if user is not None:
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            print(f"[PasswordReset] {email} → uid={uid} token={token}")
+        return Response(
+            {"detail": "If that email is registered, a reset link has been sent."}
+        )
+
+
+class PasswordResetConfirmView(APIView):
+    """POST /auth/password-reset/confirm/ — set a new password with uid+token."""
+
+    permission_classes = [AllowAny]
+    serializer_class = PasswordResetConfirmSerializer
+    api_roles = ("public",)
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            uid = force_str(urlsafe_base64_decode(data["uid"]))
+            user = User.objects.get(pk=uid)
+        except (User.DoesNotExist, ValueError, TypeError, OverflowError):
+            return Response(
+                {"detail": "Invalid reset link."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not default_token_generator.check_token(user, data["token"]):
+            return Response(
+                {"detail": "This reset link is invalid or has expired."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        user.set_password(data["new_password"])
+        user.save(update_fields=["password"])
+        return Response({"detail": "Password has been reset. You can now log in."})

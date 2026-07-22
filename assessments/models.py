@@ -180,6 +180,8 @@ class Answer(TimeStampedModel):
     )
     text_answer = models.TextField(blank=True)
     file = models.FileField(upload_to="submissions/", blank=True)
+    # S3/R2 object key for a direct-uploaded assignment file (see core.storage).
+    file_key = models.CharField(max_length=1024, blank=True)
     code = models.TextField(blank=True)
     is_correct = models.BooleanField(default=False)
     points_awarded = models.DecimalField(max_digits=7, decimal_places=2, default=0)

@@ -6,5 +6,6 @@ psycopg[binary]
 django-environ
 django-cors-headers
 drf-spectacular
+boto3
 pytest
 pytest-django

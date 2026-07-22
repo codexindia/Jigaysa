@@ -16,6 +16,15 @@ urlpatterns = [
     path("api/v1/auth/", include("accounts.urls")),
     path("api/v1/", include("courses.urls")),
     path("api/v1/", include("certificates.urls")),
+    path("api/v1/", include("library.urls")),
+    path("api/v1/", include("live.urls")),
+    path("api/v1/", include("assessments.urls")),
+    path("api/v1/", include("engagement.urls")),
+    path("api/v1/", include("notifications.urls")),
+    path("api/v1/", include("payments.urls")),
+    # Recordings (§3.11) built but parked — mount when ready:
+    # path("api/v1/", include("recordings.urls")),
+    path("api/v1/uploads/", include("core.urls")),
 
     # OpenAPI schema + interactive docs
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),

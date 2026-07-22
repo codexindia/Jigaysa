@@ -179,7 +179,20 @@ SIMPLE_JWT = {
 # OpenAPI schema (drf-spectacular)
 SPECTACULAR_SETTINGS = {
     "TITLE": "Jigaysa Smart Hybrid LMS API",
-    "DESCRIPTION": "API for the Smart Hybrid LMS platform.",
+    "DESCRIPTION": (
+        "API for the Smart Hybrid LMS platform.\n\n"
+        "**Student modules live:** Auth (incl. OTP + password reset), Courses & "
+        "enrollment, Free Library, Live Classes, Assessments, Discussions & "
+        "Community, Notifications, Payments, File Uploads.\n\n"
+        "> ⚠️ **Payments run on a MOCK gateway for now.** Checkout, GST "
+        "invoicing, coupons and access-granting all work end to end, but "
+        "`POST /orders/{id}/pay/` confirms payment synchronously with a stub — "
+        "**no real Razorpay/Stripe/PayPal/UPI integration and no money moves yet.** "
+        "Real gateway + webhook verification is pending.\n\n"
+        "> Also pending: refunds, EMI/installments, pay-per-session checkout, "
+        "corporate/group pricing, referral credits. Recordings (§3.11) and "
+        "Smart Classroom (§3.7–3.8) are not exposed yet."
+    ),
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }
@@ -196,6 +209,27 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 
 # Pluggable SMS/OTP provider (mock console provider in dev).
 SMS_PROVIDER = env("SMS_PROVIDER", default="accounts.providers.ConsoleSMSProvider")
+
+# --- Object storage (S3 / S3-compatible) for media, thumbnails & videos ----
+# Direct-to-S3 uploads: the API hands the frontend a short-lived *private*
+# presigned PUT URL (see core.storage / the /api/v1/uploads/ endpoints); the
+# browser uploads straight to the bucket and stores the returned object key in
+# the DB. Leave the bucket empty to disable the upload endpoints (they return
+# 503). ``AWS_S3_ENDPOINT_URL`` targets S3-compatible providers (Cloudflare R2,
+# MinIO, DigitalOcean Spaces); leave blank for AWS S3.
+AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
+AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default="")
+AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="")
+AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="ap-south-1")
+AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default="")
+AWS_S3_CUSTOM_DOMAIN = env("AWS_S3_CUSTOM_DOMAIN", default="")  # CDN host, no scheme
+AWS_S3_ADDRESSING_STYLE = env("AWS_S3_ADDRESSING_STYLE", default="virtual")
+AWS_S3_UPLOAD_EXPIRY = env.int("AWS_S3_UPLOAD_EXPIRY", default=900)  # 15 min
+AWS_S3_DOWNLOAD_EXPIRY = env.int("AWS_S3_DOWNLOAD_EXPIRY", default=3600)  # 1 hr
+# Hard cap advertised to clients (enforced via presigned-POST policy).
+AWS_S3_MAX_UPLOAD_BYTES = env.int(
+    "AWS_S3_MAX_UPLOAD_BYTES", default=1024 * 1024 * 1024  # 1 GiB
+)
 
 
 # Internationalization

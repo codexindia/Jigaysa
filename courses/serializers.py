@@ -309,8 +309,8 @@ class EnrollmentCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("Already enrolled in this course.")
         if not course.is_free:
             raise serializers.ValidationError(
-                "This is a paid course. Checkout via the payments module is "
-                "required (not yet available)."
+                "This is a paid course. Purchase it via checkout "
+                "(POST /api/v1/orders/ then /orders/{id}/pay/) to enrol."
             )
         return course
 
