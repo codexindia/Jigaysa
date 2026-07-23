@@ -74,7 +74,7 @@ certificate, with notifications and gamification firing along the way.
   signal handlers create in-app notifications on **enrollment, certificate
   issued, assessment passed/graded, live-session registration**, honoring the
   user's per-channel preferences.
-
+u
 ### 2.6 Payments & Purchase (PRD §3.3, §3.4, §3.13) — `/api/v1/`
 - `GET  /pricing-plans/` — platform-access plans (monthly/quarterly/annual).
 - `GET  /course-prices/?course=` — a course's price options.
